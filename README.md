@@ -38,6 +38,7 @@ conda env update -f environment.yml --prune
 
 Ouvrir `http://localhost:8000` : le frontend est servi directement par FastAPI.
 
+
 ## 3. Déployer sur EC2
 
 1. **Lancer une instance EC2** (Ubuntu 24.04, t2.micro/t3.micro suffit largement).
@@ -57,11 +58,36 @@ Ouvrir `http://localhost:8000` : le frontend est servi directement par FastAPI.
    ```bash
    sudo systemctl restart booktracker
    ```
+   si ça affiche n'existe pas 
+   se mettre dans
+   /home/ubuntu/book-tracker/deploy
+   et faire :
+   ```bash
+   sudo cp booktracker.service /etc/systemd/system/booktracker.service
+
+   sudo systemctl daemon-reload
+
+   sudo systemctl start booktracker
+   ```
+
 6. Le site est accessible sur `http://<IP_publique_EC2>/`.
 
 Pour un nom de domaine + HTTPS, ajouter Certbot (`sudo apt install certbot python3-certbot-nginx && sudo certbot --nginx`) une fois un DNS pointé vers l'IP.
 
-## 4. Planning indicatif (3-4 jours)
+## 4 Google
+
+1. Sur Google Cloud ouverir la console
+2. Créer un nouveau projet
+3. Rechercher Books API et activer
+4. Dans le menu principale aller dans API créer une clé API en la resteignant à BooksAPI
+5. faire 
+   ```bash
+   nano ~/book-tracker/backend/.env ajouter GOOGLE_BOOKS_API_KEY=clé
+   sudo systemctl restart booktracker
+   sudo systemctl restart booktracker #pour tester le call
+   ```
+
+## 5. Planning indicatif (3-4 jours)
 
 - **Jour 1** : Neon + backend en local (recherche Google Books, ajout à la bibliothèque, mise à jour de la progression). Tester avec l'interface Swagger (`/docs`).
 - **Jour 2** : Frontend (bibliothèque, recherche, mise à jour de statut/progression/note).

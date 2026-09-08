@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Carnet de lecture</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <h1>Carnet de lecture</h1>
+      <nav class="tabs">
+        <button class="tab-btn active" data-tab="library">Ma bibliothèque</button>
+        <button class="tab-btn" data-tab="search">Ajouter un livre</button>
+        <button class="tab-btn" data-tab="recos">Recommandations</button>
+      </nav>
+    </header>
+
+    <main>
+      <section id="tab-library" class="tab-panel active">
+        <div class="filters">
+          <button class="filter-btn active" data-status="">Tous</button>
+          <button class="filter-btn" data-status="to_read">À lire</button>
+          <button class="filter-btn" data-status="reading">En cours</button>
+          <button class="filter-btn" data-status="read">Terminés</button>
+        </div>
+        <div id="library-grid" class="grid"></div>
+        <p id="library-empty" class="empty-state" hidden>Votre bibliothèque est vide. Ajoutez un premier livre dans l'onglet « Ajouter un livre ».</p>
+      </section>
+
+      <section id="tab-search" class="tab-panel">
+        <form id="search-form" class="search-bar">
+          <input id="search-input" type="text" placeholder="Titre, auteur..." autocomplete="off">
+          <button type="submit">Rechercher</button>
+        </form>
+        <div id="search-grid" class="grid"></div>
+      </section>
+
+      <section id="tab-recos" class="tab-panel">
+        <p class="reco-intro">Basées sur les auteurs et genres des livres que vous avez marqués « Terminés ».</p>
+        <div id="reco-grid" class="grid"></div>
+        <p id="reco-empty" class="empty-state" hidden>Terminez d'abord quelques livres pour débloquer des recommandations.</p>
+      </section>
+    </main>
+  </div>
+
+  <template id="book-card-template">
+    <article class="book-card">
+      <div class="cover">
+        <img alt="">
+      </div>
+      <div class="details">
+        <h3 class="title"></h3>
+        <p class="authors"></p>
+        <div class="status-row"></div>
+        <div class="progress-row" hidden>
+          <div class="progress-bar"><div class="progress-fill"></div></div>
+          <span class="progress-label"></span>
+        </div>
+        <div class="rating-row" hidden></div>
+        <button class="action-btn"></button>
+      </div>
+    </article>
+  </template>
+
+  <script src="app.js"></script>
+</body>
+</html>

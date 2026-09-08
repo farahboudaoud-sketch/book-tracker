@@ -1,0 +1,30 @@
+import os
+import httpx
+
+GOOGLE_BOOKS_API = "https://www.googleapis.com/books/v1/volumes"
+API_KEY = os.environ.get("GOOGLE_BOOKS_API_KEY")  # optionnel, augmente juste le quota
+
+
+def _parse_item(item: dict) -> dict:
+    info = item.get("volumeInfo", {})
+    images = info.get("imageLinks", {})
+    return {
+        "external_id": item.get("id"),
+        "title": info.get("title", "Titre inconnu"),
+        "authors": ", ".join(info.get("authors", [])),
+        "categories": ", ".join(info.get("categories", [])),
+        "thumbnail": images.get("thumbnail"),
+        "published_year": (info.get("publishedDate") or "")[:4],
+        "description": info.get("description"),
+    }
+
+
+def search_books(query: str, max_results: int = 10) -> list[dict]:
+    params = {"q": query, "maxResults": max_results}
+    if API_KEY:
+        params["key"] = API_KEY
+    with httpx.Client(timeout=10) as client:
+        resp = client.get(GOOGLE_BOOKS_API, params=params)
+        resp.raise_for_status()
+        data = resp.json()
+    return [_parse_item(item) for item in data.get("items", [])]

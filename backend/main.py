@@ -248,7 +248,7 @@ def recommendations(
 ):
     return get_recommendations(
         db,
-        limit=10
+        limit=50
     )
 
 

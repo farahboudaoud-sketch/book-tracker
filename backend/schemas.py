@@ -11,6 +11,7 @@ class BookOut(BaseModel):
     categories: str
     thumbnail: Optional[str] = None
     published_year: Optional[str] = None
+    description: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -23,9 +24,10 @@ class AddBookIn(BaseModel):
     categories: str = ""
     thumbnail: Optional[str] = None
     published_year: Optional[str] = None
+    description: Optional[str] = None
     total_pages: int = 0
     status: str = "to_read"   # to_read | reading | read
-
+    
 
 class UpdateProgressIn(BaseModel):
     status: Optional[str] = None

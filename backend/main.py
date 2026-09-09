@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from html import escape
 
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from database import Base, engine, get_db
 from models import Book, UserBook
 from schemas import AddBookIn, UpdateProgressIn, LibraryEntryOut, BookOut
-from google_books import search_books
+from google_books import search_books, get_book_by_id
 from recommend import get_recommendations
 
 
@@ -262,18 +262,13 @@ def recommendations(
 )
 def book_detail(external_id: str):
 
-    results = search_books(
-        f"id:{external_id}",
-        max_results=1
-    )
+    book = get_book_by_id(external_id)
 
-    if not results:
+    if not book:
         raise HTTPException(
             404,
             "Livre introuvable"
         )
-
-    book = results[0]
 
     title = escape(
         book.get("title") or "Titre inconnu"
@@ -452,7 +447,7 @@ def book_detail(external_id: str):
 )
 def add_book_from_detail(
     external_id: str,
-    status: str,
+    status: str = Form(...),
     db: Session = Depends(get_db)
 ):
 
@@ -468,18 +463,13 @@ def add_book_from_detail(
         )
 
     # Récupérer le livre depuis Google Books
-    results = search_books(
-        f"id:{external_id}",
-        max_results=1
-    )
+    book_data = get_book_by_id(external_id)
 
-    if not results:
+    if not book_data:
         raise HTTPException(
             404,
             "Livre introuvable"
         )
-
-    book_data = results[0]
 
     # Chercher le livre dans notre base
     book = db.query(Book).filter(

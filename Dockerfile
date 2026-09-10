@@ -13,7 +13,7 @@ RUN pip install --no-cache-dir -r /dependencies/requirements.txt
 
 # Code de l'application (backend + frontend)
 
-
+ENV PORT=$PORT
 EXPOSE $PORT
 
-CMD ["sh", "-c", "cd backend && uvicorn main:app --host 0.0.0.0 --port ${PORT:-8080}"]
+CMD ["sh", "-c", "cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT"]

@@ -19,8 +19,8 @@ def _parse_item(item: dict) -> dict:
     }
 
 
-def search_books(query: str, max_results: int = 10) -> list[dict]:
-    params = {"q": query, "maxResults": max_results}
+def search_books(query: str, max_results: int = 10, start_index: int = 0) -> list[dict]:
+    params = {"q": query, "maxResults": max_results, "startIndex": start_index}
     if API_KEY:
         params["key"] = API_KEY
     with httpx.Client(timeout=10) as client:

@@ -143,7 +143,7 @@ def main():
                     inserted += 1
 
                 print(f"[{category}] +{len(new_books)} livres (total : {inserted}/{TARGET_TOTAL})")
-                time.sleep(0.5)  # ménage l'API Google Books (évite le rate limiting)
+                time.sleep(2)  # ménage l'API Google Books (évite le rate limiting)
 
     print(f"\nTerminé : {inserted} livres insérés dans Neo4j.")
     driver.close()

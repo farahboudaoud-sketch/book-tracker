@@ -1,13 +1,18 @@
 """
 Wrapper partagé autour du modèle d'embeddings de phrases (sentence-transformers).
 Chargé une seule fois par processus (paresseux), réutilisé à la fois par
-populate_graph.py (ingestion des 2000 livres dans Neo4j) et recommend.py
+populate_graph.py (ingestion des livres dans Neo4j) et recommend.py
 (calcul du "profil de goûts" à comparer aux embeddings stockés dans Neo4j).
+
+Modèle : BAAI/bge-m3 — meilleur que multilingual-e5-large sur le MTEB
+français (58.79 vs 56.07), contexte 8192 tokens (les résumés de livres,
+même longs, ne sont jamais tronqués), et pas de préfixe query:/passage:
+à gérer contrairement aux modèles e5.
 """
 from sentence_transformers import SentenceTransformer
 
-_MODEL_NAME = "all-MiniLM-L6-v2"
-EMBEDDING_DIM = 384  # dimension des vecteurs produits par ce modèle
+_MODEL_NAME = "BAAI/bge-m3"
+EMBEDDING_DIM = 1024  # dimension des vecteurs produits par ce modèle
 
 _model: SentenceTransformer | None = None
 

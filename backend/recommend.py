@@ -92,7 +92,18 @@ def get_recommendations(db: Session, limit: int = 10) -> list[dict]:
     if profile is None:
         return []  # aucun résumé exploitable parmi les livres lus
 
-    read_external_ids = [book.external_id for _, book in read_entries]
+    # ------------------------------------------------------------------
+    # Noms d'auteurs/catégories de tes livres lus, extraits directement de
+    # Neon — on ne dépend PAS de la présence de ces livres comme nœuds
+    # dans le pool Neo4j (ils n'y sont généralement pas : le pool des 2000
+    # et ta bibliothèque personnelle sont deux ensembles distincts).
+    # ------------------------------------------------------------------
+    read_authors: set[str] = set()
+    read_categories: set[str] = set()
+    for _, book in read_entries:
+        read_authors.update(a.strip() for a in (book.authors or "").split(",") if a.strip())
+        read_categories.update(c.strip() for c in (book.categories or "").split(",") if c.strip())
+
     already_have_ids = [row[0] for row in db.query(Book.external_id).all()]
 
     fetch_limit = max(limit * 5, 50)  # marge pour compenser dédup + exclusions
@@ -101,19 +112,16 @@ def get_recommendations(db: Session, limit: int = 10) -> list[dict]:
     with driver.session() as session:
         result = session.run(
             """
-            MATCH (read:Book) WHERE read.external_id IN $read_ids
-            WITH collect(read) AS readBooks
-
             CALL db.index.vector.queryNodes('book_embeddings', $k, $profile_vector)
             YIELD node AS candidate, score AS similarity
             WHERE NOT candidate.external_id IN $exclude_ids
 
-            OPTIONAL MATCH (candidate)-[:BY]->(a:Author)<-[:BY]-(rb:Book)
-            WHERE rb IN readBooks
-            WITH candidate, similarity, readBooks, count(DISTINCT a) AS authorOverlap
+            OPTIONAL MATCH (candidate)-[:BY]->(a:Author)
+            WHERE a.name IN $read_authors
+            WITH candidate, similarity, count(DISTINCT a) AS authorOverlap
 
-            OPTIONAL MATCH (candidate)-[:IN_CATEGORY]->(c:Category)<-[:IN_CATEGORY]-(rb2:Book)
-            WHERE rb2 IN readBooks
+            OPTIONAL MATCH (candidate)-[:IN_CATEGORY]->(c:Category)
+            WHERE c.name IN $read_categories
             WITH candidate, similarity, authorOverlap, count(DISTINCT c) AS categoryOverlap
 
             RETURN candidate.external_id AS external_id,
@@ -128,9 +136,10 @@ def get_recommendations(db: Session, limit: int = 10) -> list[dict]:
                       + similarity * $similarity_weight) DESC
             LIMIT $fetch_limit
             """,
-            read_ids=read_external_ids,
             profile_vector=profile,
             exclude_ids=already_have_ids,
+            read_authors=list(read_authors),
+            read_categories=list(read_categories),
             k=fetch_limit,
             fetch_limit=fetch_limit,
             author_weight=AUTHOR_WEIGHT,
@@ -153,7 +162,9 @@ def get_recommendations(db: Session, limit: int = 10) -> list[dict]:
             + candidate["categoryOverlap"] * CATEGORY_WEIGHT
             + candidate["similarity"] * SIMILARITY_WEIGHT
         )
-
+        print(candidate["authorOverlap"])
+        print(candidate["categoryOverlap"])
+        print(candidate["similarity"])
         matched_group = None
         if author_key:
             for group in groups:

@@ -3,6 +3,14 @@ Script d'ingestion : peuple Neo4j avec ~2000 livres récupérés sur Google Book
 répartis sur une large liste de catégories, avec leurs embeddings de résumé
 et leurs relations vers auteurs/catégories.
 
+Pour chaque livre trouvé par la recherche par sujet, on refait un appel
+get_book_by_id() — l'endpoint dédié /volumes/{id}, celui-là même qu'utilise
+la page de détail (/book/{external_id}) — afin d'obtenir sa fiche la plus
+complète (souvent avec des catégories plus détaillées que la recherche par
+sujet seule). Ça double le nombre d'appels à l'API Google Books, donc
+attends-toi à une ingestion sensiblement plus lente et plus consommatrice
+de quota.
+
 ⚠️ À exécuter UNE SEULE FOIS (ou ponctuellement pour enrichir le pool),
 PAS à chaque appel de l'API de recommandations :
 
@@ -14,12 +22,13 @@ Prérequis : NEO4J_URI / NEO4J_USER / NEO4J_PASSWORD dans backend/.env
 """
 import time
 
-from google_books import search_books
+from google_books import search_books, get_book_by_id
 from embeddings import embed_texts, EMBEDDING_DIM
 from neo4j_client import get_driver
 
 TARGET_TOTAL = 2000
 RESULTS_PER_PAGE = 40  # maximum autorisé par requête sur l'API Google Books
+MAX_PAGES_PER_CATEGORY = 10  # sécurité : évite qu'une seule catégorie n'épuise tout le quota
 
 # Liste volontairement large et variée pour obtenir un pool diversifié
 CATEGORIES = [
@@ -35,8 +44,11 @@ CATEGORIES = [
 
 
 def create_schema(session):
-    """Index vectoriel + contraintes d'unicité, à créer une seule fois
-    (IF NOT EXISTS rend le script rejouable sans erreur)."""
+    """Index vectoriel + contraintes d'unicité.
+    ⚠️ On supprime l'index existant avant de le recréer : un changement de
+    modèle d'embeddings (donc de dimension) n'est pas rétrocompatible avec
+    un index déjà en place à l'ancienne dimension."""
+    session.run("DROP INDEX book_embeddings IF EXISTS")
     session.run(
         """
         CREATE VECTOR INDEX book_embeddings IF NOT EXISTS
@@ -106,13 +118,20 @@ def main():
         print("Création de l'index vectoriel et des contraintes...")
         create_schema(session)
 
+        existing = session.run("MATCH (b:Book) RETURN b.external_id AS id")
+        seen_ids.update(record["id"] for record in existing)
+        inserted = len(seen_ids)
+        print(f"{inserted} livres déjà présents dans Neo4j (repris tels quels).")
+
         for category in CATEGORIES:
             if inserted >= TARGET_TOTAL:
                 break
 
-            for start_index in (0, RESULTS_PER_PAGE):
+            for page in range(MAX_PAGES_PER_CATEGORY):
                 if inserted >= TARGET_TOTAL:
                     break
+
+                start_index = page * RESULTS_PER_PAGE
 
                 try:
                     results = search_books(
@@ -122,27 +141,48 @@ def main():
                     )
                 except Exception as e:
                     print(f"  ! Erreur sur '{category}' (start={start_index}) : {e}")
-                    continue
+                    break  # on arrête cette catégorie plutôt que de boucler sur la même erreur
+
+                # Plus aucun résultat renvoyé : on a épuisé ce que Google Books
+                # a à offrir pour cette catégorie, inutile d'aller plus loin.
+                if not results:
+                    break
 
                 # On ne garde que les livres avec un résumé : sans texte,
                 # pas d'embedding possible, et donc pas de recommandation
                 # sémantique pour ce livre.
-                new_books = [
+                candidates = [
                     r for r in results
                     if r["external_id"] not in seen_ids and r.get("description")
                 ]
 
-                if not new_books:
-                    continue
+                # Enrichissement : on refait un appel get_book_by_id pour
+                # chaque candidat, comme le fait la page de détail, afin
+                # d'avoir sa fiche la plus complète (catégories notamment).
+                new_books = []
+                for candidate in candidates:
+                    enriched = get_book_by_id(candidate["external_id"])
+                    if enriched and enriched.get("description"):
+                        new_books.append(enriched)
+                    else:
+                        new_books.append(candidate)  # repli sur la version recherche
+                    time.sleep(0.3)  # un appel de plus par livre, on ménage le quota
 
-                embeddings = embed_texts([b["description"] for b in new_books])
+                if new_books:
+                    embeddings = embed_texts([b["description"] for b in new_books])
 
-                for book, embedding in zip(new_books, embeddings):
-                    seen_ids.add(book["external_id"])
-                    insert_book(session, book, embedding.tolist())
-                    inserted += 1
+                    for book, embedding in zip(new_books, embeddings):
+                        seen_ids.add(book["external_id"])
+                        insert_book(session, book, embedding.tolist())
+                        inserted += 1
 
-                print(f"[{category}] +{len(new_books)} livres (total : {inserted}/{TARGET_TOTAL})")
+                    print(f"[{category}] +{len(new_books)} livres (total : {inserted}/{TARGET_TOTAL})")
+
+                # Si Google a renvoyé moins que le maximum demandé, c'est la
+                # dernière page disponible pour cette catégorie.
+                if len(results) < RESULTS_PER_PAGE:
+                    break
+
                 time.sleep(2)  # ménage l'API Google Books (évite le rate limiting)
 
     print(f"\nTerminé : {inserted} livres insérés dans Neo4j.")

@@ -352,6 +352,27 @@ body::before {
   border-color: var(--rose);
 }
 
+.add-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+}
+
+.add-picker select {
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--card);
+  color: var(--ink);
+  font: inherit;
+  font-size: .8rem;
+}
+
 .empty-state {
   padding: 64px 20px;
   border: 1px dashed var(--line);
